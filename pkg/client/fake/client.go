@@ -49,9 +49,14 @@ type versionedTracker struct {
 }
 
 type fakeClient struct {
-	tracker         versionedTracker
-	scheme          *runtime.Scheme
-	restMapper      meta.RESTMapper
+	tracker    versionedTracker
+	scheme     *runtime.Scheme
+	restMapper meta.RESTMapper
+
+	// indexes maps each GroupVersionResource (GVR) to the indexes registered for that GVR.
+	// The inner map maps from index name to IndexerFunc.
+	indexes map[schema.GroupVersionResource]map[string]client.IndexerFunc
+
 	schemeWriteLock sync.Mutex
 }
 
@@ -93,6 +98,10 @@ type ClientBuilder struct {
 	initLists          []client.ObjectList
 	initRuntimeObjects []runtime.Object
 	objectTracker      testing.ObjectTracker
+
+	// indexes maps each GroupVersionResource (GVR) to the indexes registered for that GVR.
+	// The inner map maps from index name to IndexerFunc.
+	indexes map[schema.GroupVersionResource]map[string]client.IndexerFunc
 }
 
 // WithScheme sets this builder's internal scheme.
@@ -135,6 +144,27 @@ func (f *ClientBuilder) WithObjectTracker(ot testing.ObjectTracker) *ClientBuild
 	return f
 }
 
+// WithObjectTracker can be optionally used to initialize this fake client with testing.ObjectTracker.
+func (f *ClientBuilder) WithIndex(gvr schema.GroupVersionResource,
+	name string,
+	indexer client.IndexerFunc) *ClientBuilder {
+
+	// If this is the first index being registered, we initialize the map storing all the indexes.
+	if f.indexes == nil {
+		f.indexes = make(map[schema.GroupVersionResource]map[string]client.IndexerFunc)
+	}
+
+	// If this is the first index being registered for the input GroupVersionResource, we initialize
+	// the map storing the indexes for that GroupVersionResource.
+	if f.indexes[gvr] == nil {
+		f.indexes[gvr] = make(map[string]client.IndexerFunc)
+	}
+
+	f.indexes[gvr][name] = indexer
+
+	return f
+}
+
 // Build builds and returns a new fake client.
 func (f *ClientBuilder) Build() client.WithWatch {
 	if f.scheme == nil {
@@ -171,6 +201,7 @@ func (f *ClientBuilder) Build() client.WithWatch {
 		tracker:    tracker,
 		scheme:     f.scheme,
 		restMapper: f.restMapper,
+		indexes:    f.indexes,
 	}
 }
 
