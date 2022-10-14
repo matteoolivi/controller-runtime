@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -465,6 +466,41 @@ func (c *fakeClient) List(ctx context.Context, obj client.ObjectList, opts ...cl
 			return err
 		}
 	}
+
+	if listOpts.FieldSelector != nil {
+		objs, err := meta.ExtractList(obj)
+		if err != nil {
+			return err
+		}
+		if _, hasIndexes := c.indexes[gvr]; !hasIndexes {
+			panic(fmt.Errorf("List on GroupVersionResource %v specifies field selector, but no "+
+				"indexes for that GroupResourceVersion are defined", gvr))
+		}
+
+		filteredObjs := make([]runtime.Object, 0, len(objs))
+		for _, o := range objs {
+			// convert o from runtime.Object to client.Object because that's what index functions
+			// accept.
+			co, ok := o.(client.Object)
+			if !ok {
+				panic(fmt.Errorf("obj %v in list doesn't implement client.Object interface", o))
+			}
+			oFields := make(map[string]string)
+			for indexName, indexFunc := range c.indexes[gvr] {
+				indexVals := indexFunc(co)
+				if len(indexVals) == 1 {
+					oFields[indexName] = indexVals[0]
+				}
+			}
+			if listOpts.FieldSelector.Matches(fields.Set(oFields)) {
+				filteredObjs = append(filteredObjs, o)
+			}
+		}
+		if err := meta.SetList(obj, filteredObjs); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
