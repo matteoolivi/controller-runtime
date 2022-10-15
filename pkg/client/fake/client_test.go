@@ -1083,7 +1083,7 @@ var _ = Describe("Fake client", func() {
 			})
 
 			// TODO: Move all the tests with multiple Indexes to a dedicated context.
-			It("Ignores the registered index that's not part of the field selector", func() {
+			It("Ignores the registered index that's not part of the field selector when there are matches", func() {
 				cl = cb.WithIndex(depGVR, "spec.strategy.type", depStrategyTypeIndexer).Build()
 				listOpts := &client.ListOptions{
 					FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
@@ -1092,9 +1092,18 @@ var _ = Describe("Fake client", func() {
 				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
 				Expect(list.Items).To(ConsistOf(*dep, *dep2))
 			})
+
+			It("Ignores the registered index that's not part of the field selector when there are no matches", func() {
+				cl = cb.WithIndex(depGVR, "spec.strategy.type", depStrategyTypeIndexer).Build()
+				listOpts := &client.ListOptions{
+					FieldSelector: fields.OneTermEqualSelector("spec.replicas", "2"),
+				}
+				list := &appsv1.DeploymentList{}
+				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
+				Expect(list.Items).To(BeEmpty())
+			})
 		})
 
-		// multiple indexes but only one is in the list options, there are no matches
 		// multiple indexes and all are in the list options, matches are returned
 		// multiple indexes and all are in the list options, there are no matches
 		// both index and label selector in list options, matches are returned
