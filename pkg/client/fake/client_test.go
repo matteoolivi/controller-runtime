@@ -1002,13 +1002,22 @@ var _ = Describe("Fake client", func() {
 	})
 
 	Context("with Indexes", func() {
-		deploymentReplicasIndexer := func(obj client.Object) []string {
+		depReplicasIndexer := func(obj client.Object) []string {
 			dep, ok := obj.(*appsv1.Deployment)
 			if !ok {
-				panic(fmt.Errorf("indexer function for type %T received object of type %T, this "+
-					"should never happen", appsv1.Deployment{}, obj))
+				panic(fmt.Errorf("indexer function for type %T's spec.replicas field received"+
+					" object of type %T, this should never happen", appsv1.Deployment{}, obj))
 			}
 			return []string{strconv.Itoa(int(*dep.Spec.Replicas))}
+		}
+
+		depStrategyTypeIndexer := func(obj client.Object) []string {
+			dep, ok := obj.(*appsv1.Deployment)
+			if !ok {
+				panic(fmt.Errorf("indexer function for type %T's spec.strategy.type field received"+
+					" object of type %T, this should never happen", appsv1.Deployment{}, obj))
+			}
+			return []string{string(dep.Spec.Strategy.Type)}
 		}
 
 		var (
@@ -1020,7 +1029,7 @@ var _ = Describe("Fake client", func() {
 			BeforeEach(func() {
 				cb = NewClientBuilder().WithObjects(dep, dep2, cm)
 				depGVR = appsv1.SchemeGroupVersion.WithResource("deployments")
-				cl = cb.WithIndex(depGVR, "spec.replicas", deploymentReplicasIndexer).Build()
+				cl = cb.WithIndex(depGVR, "spec.replicas", depReplicasIndexer).Build()
 			})
 			AssertClientBehavior()
 		})
@@ -1029,7 +1038,7 @@ var _ = Describe("Fake client", func() {
 			BeforeEach(func() {
 				cb = NewClientBuilder().
 					WithObjects(dep, dep2, cm).
-					WithIndex(depGVR, "spec.replicas", deploymentReplicasIndexer)
+					WithIndex(depGVR, "spec.replicas", depReplicasIndexer)
 				depGVR = appsv1.SchemeGroupVersion.WithResource("deployments")
 			})
 			It("Panics when there's no Index for the GroupVersionResource", func() {
@@ -1073,9 +1082,18 @@ var _ = Describe("Fake client", func() {
 				Expect(list.Items).To(BeEmpty())
 			})
 
-			// just one index, no objects match
+			// TODO: Move all the tests with multiple Indexes to a dedicated context.
+			It("Ignores the registered index that's not part of the field selector", func() {
+				cl = cb.WithIndex(depGVR, "spec.strategy.type", depStrategyTypeIndexer).Build()
+				listOpts := &client.ListOptions{
+					FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
+				}
+				list := &appsv1.DeploymentList{}
+				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
+				Expect(list.Items).To(ConsistOf(*dep, *dep2))
+			})
 		})
-		// multiple indexes but only one is in the list options, matches are returned
+
 		// multiple indexes but only one is in the list options, there are no matches
 		// multiple indexes and all are in the list options, matches are returned
 		// multiple indexes and all are in the list options, there are no matches
