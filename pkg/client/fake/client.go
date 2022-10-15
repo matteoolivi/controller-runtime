@@ -145,7 +145,10 @@ func (f *ClientBuilder) WithObjectTracker(ot testing.ObjectTracker) *ClientBuild
 	return f
 }
 
-// WithObjectTracker can be optionally used to initialize this fake client with testing.ObjectTracker.
+// WithIndex can be optionally used to register an index with name `name` and indexer `indexer` for
+// API objects of GroupVersionResource `gvr` in the fake client.
+// It can be invoked multiple times, both with different GroupVersionResource or the same one.
+// Invoking WithIndex twice with the same `name` and `gvr` will panic.
 func (f *ClientBuilder) WithIndex(gvr schema.GroupVersionResource,
 	name string,
 	indexer client.IndexerFunc) *ClientBuilder {
@@ -159,6 +162,10 @@ func (f *ClientBuilder) WithIndex(gvr schema.GroupVersionResource,
 	// the map storing the indexes for that GroupVersionResource.
 	if f.indexes[gvr] == nil {
 		f.indexes[gvr] = make(map[string]client.IndexerFunc)
+	}
+
+	if _, nameAlreadyTaken := f.indexes[gvr][name]; nameAlreadyTaken {
+		panic(fmt.Errorf("indexer conflict: index name %s is already registered for GroupVersionResource %v", name, gvr))
 	}
 
 	f.indexes[gvr][name] = indexer

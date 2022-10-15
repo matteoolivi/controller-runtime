@@ -1026,7 +1026,6 @@ var _ = Describe("Fake client", func() {
 			cb     *ClientBuilder
 		)
 
-		// TODO: from a8s: should WithIndex panic if an index is already registered?
 		BeforeEach(func() {
 			cb = NewClientBuilder().
 				WithObjects(dep, dep2, cm).
@@ -1230,5 +1229,22 @@ var _ = Describe("Fake client", func() {
 		err = cl.Get(context.Background(), namespacedName3, obj)
 		Expect(err).To(BeNil())
 		Expect(obj).To(Equal(dep3))
+	})
+})
+
+var _ = Describe("Fake client builder", func() {
+	It("Panics when an index with the same name and GroupVersionResource is registered twice", func() {
+		// We need any realistic GroupVersionResource, the choice of deployments is arbitrary.
+		gvr := appsv1.SchemeGroupVersion.WithResource("deployments")
+
+		cb := NewClientBuilder().WithIndex(gvr,
+			"test-name",
+			func(client.Object) []string { return nil })
+
+		Expect(func() {
+			cb.WithIndex(gvr,
+				"test-name",
+				func(client.Object) []string { return []string{"foo"} })
+		}).To(Panic())
 	})
 })
