@@ -1052,8 +1052,17 @@ var _ = Describe("Fake client", func() {
 				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
 				Expect(list.Items).To(BeEmpty())
 			})
+
+			It("Returns two deployments that match the single field selector requirement", func() {
+				cl = cb.Build()
+				listOpts := &client.ListOptions{
+					FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
+				}
+				list := &appsv1.DeploymentList{}
+				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
+				Expect(list.Items).To(ConsistOf(*dep, *dep2))
+			})
 		})
-		// just one index, some objects match
 		// just one index, no objects match
 		// multiple indexes but only one is in the list options, matches are returned
 		// multiple indexes but only one is in the list options, there are no matches
