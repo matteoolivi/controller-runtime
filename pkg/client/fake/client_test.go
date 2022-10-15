@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
 
@@ -1082,6 +1083,20 @@ var _ = Describe("Fake client", func() {
 				Expect(list.Items).To(BeEmpty())
 			})
 
+			It("Returns deployment that matches both the field and label selectors", func() {
+				cl = cb.Build()
+				listOpts := &client.ListOptions{
+					FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
+					LabelSelector: labels.SelectorFromSet(dep2.Labels),
+				}
+				list := &appsv1.DeploymentList{}
+				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
+				Expect(list.Items).To(ConsistOf(*dep2))
+			})
+
+			// both index and label selector in list options, there are no matches because label selector doesn't match
+			// both index and label selector in list options, there are no matches because index doesn't match
+
 			// TODO: Move all the tests with multiple Indexes to a dedicated context.
 			It("Ignores the registered index that's not part of the field selector when there are matches", func() {
 				cl = cb.WithIndex(depGVR, "spec.strategy.type", depStrategyTypeIndexer).Build()
@@ -1127,10 +1142,6 @@ var _ = Describe("Fake client", func() {
 				Expect(list.Items).To(BeEmpty())
 			})
 		})
-
-		// both index and label selector in list options, matches are returned
-		// both index and label selector in list options, there are no matches because label selector doesn't match
-		// both index and label selector in list options, there are no matches because index doesn't match
 	})
 
 	It("should set the ResourceVersion to 999 when adding an object to the tracker", func() {
