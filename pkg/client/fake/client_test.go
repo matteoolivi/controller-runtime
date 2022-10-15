@@ -20,11 +20,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -45,6 +48,7 @@ var _ = Describe("Fake client", func() {
 	var cl client.WithWatch
 
 	BeforeEach(func() {
+		replicas := int32(1)
 		dep = &appsv1.Deployment{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: "apps/v1",
@@ -54,6 +58,12 @@ var _ = Describe("Fake client", func() {
 				Name:            "test-deployment",
 				Namespace:       "ns1",
 				ResourceVersion: trackerAddResourceVersion,
+			},
+			Spec: appsv1.DeploymentSpec{
+				Replicas: &replicas,
+				Strategy: appsv1.DeploymentStrategy{
+					Type: appsv1.RecreateDeploymentStrategyType,
+				},
 			},
 		}
 		dep2 = &appsv1.Deployment{
@@ -68,6 +78,12 @@ var _ = Describe("Fake client", func() {
 					"test-label": "label-value",
 				},
 				ResourceVersion: trackerAddResourceVersion,
+			},
+			Spec: appsv1.DeploymentSpec{
+				Replicas: &replicas,
+				Strategy: appsv1.DeploymentStrategy{
+					Type: appsv1.RollingUpdateDeploymentStrategyType,
+				},
 			},
 		}
 		cm = &corev1.ConfigMap{
@@ -983,6 +999,59 @@ var _ = Describe("Fake client", func() {
 				Build()
 		})
 		AssertClientBehavior()
+	})
+
+	Context("with Indexes", func() {
+		deploymentReplicasIndexer := func(obj client.Object) []string {
+			dep, ok := obj.(*appsv1.Deployment)
+			if !ok {
+				panic(fmt.Errorf("indexer function for type %T received object of type %T, this "+
+					"should never happen", appsv1.Deployment{}, obj))
+			}
+			return []string{strconv.Itoa(int(*dep.Spec.Replicas))}
+		}
+
+		var (
+			depGVR schema.GroupVersionResource
+			cb     *ClientBuilder
+		)
+
+		Context("Behavior that doesn't require an Index", func() {
+			BeforeEach(func() {
+				cb = NewClientBuilder().WithObjects(dep, dep2, cm)
+				depGVR = appsv1.SchemeGroupVersion.WithResource("deployments")
+				cl = cb.WithIndex(depGVR, "spec.replicas", deploymentReplicasIndexer).Build()
+			})
+			AssertClientBehavior()
+		})
+
+		Context("Filtered List", func() {
+			BeforeEach(func() {
+				cb = NewClientBuilder().
+					WithObjects(dep, dep2, cm).
+					WithIndex(depGVR, "spec.replicas", deploymentReplicasIndexer)
+				depGVR = appsv1.SchemeGroupVersion.WithResource("deployments")
+			})
+			It("Panics when there's no Index for the GroupVersionResource", func() {
+				cl = cb.Build()
+				listOpts := &client.ListOptions{
+					FieldSelector: fields.Everything(),
+				}
+				Expect(func() {
+					cl.List(context.Background(), &corev1.ConfigMapList{}, listOpts)
+				}).To(Panic())
+			})
+		})
+		// there are indexes in the list request, but not the registered ones, nothing is returned.
+		// just one index, some objects match
+		// just one index, no objects match
+		// multiple indexes but only one is in the list options, matches are returned
+		// multiple indexes but only one is in the list options, there are no matches
+		// multiple indexes and all are in the list options, matches are returned
+		// multiple indexes and all are in the list options, there are no matches
+		// both index and label selector in list options, matches are returned
+		// both index and label selector in list options, there are no matches because label selector doesn't match
+		// both index and label selector in list options, there are no matches because index doesn't match
 	})
 
 	It("should set the ResourceVersion to 999 when adding an object to the tracker", func() {
