@@ -1026,26 +1026,23 @@ var _ = Describe("Fake client", func() {
 			cb     *ClientBuilder
 		)
 
+		// TODO: from a8s: should WithIndex panic if an index is already registered?
+		BeforeEach(func() {
+			cb = NewClientBuilder().
+				WithObjects(dep, dep2, cm).
+				WithIndex(depGVR, "spec.replicas", depReplicasIndexer)
+			depGVR = appsv1.SchemeGroupVersion.WithResource("deployments")
+		})
+
 		Context("client has just one Index", func() {
+			BeforeEach(func() { cl = cb.Build() })
+
 			Context("behavior that doesn't require an Index", func() {
-				BeforeEach(func() {
-					cb = NewClientBuilder().WithObjects(dep, dep2, cm)
-					depGVR = appsv1.SchemeGroupVersion.WithResource("deployments")
-					cl = cb.WithIndex(depGVR, "spec.replicas", depReplicasIndexer).Build()
-				})
 				AssertClientBehavior()
 			})
 
 			Context("filtered List", func() {
-				BeforeEach(func() {
-					cb = NewClientBuilder().
-						WithObjects(dep, dep2, cm).
-						WithIndex(depGVR, "spec.replicas", depReplicasIndexer)
-					depGVR = appsv1.SchemeGroupVersion.WithResource("deployments")
-				})
-
 				It("Panics when there's no Index for the GroupVersionResource", func() {
-					cl = cb.Build()
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.Everything(),
 					}
@@ -1056,7 +1053,6 @@ var _ = Describe("Fake client", func() {
 
 				It("Returns the empty list when no index with the field selector key is registered", func() {
 					// TODO: make this test more precise in asserting the desired behavior.
-					cl = cb.Build()
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.OneTermEqualSelector("spec.paused", "false"),
 					}
@@ -1066,7 +1062,6 @@ var _ = Describe("Fake client", func() {
 				})
 
 				It("Returns two deployments that match the only field selector requirement", func() {
-					cl = cb.Build()
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
 					}
@@ -1076,7 +1071,6 @@ var _ = Describe("Fake client", func() {
 				})
 
 				It("Returns no object because no object matches the only field selector requirement", func() {
-					cl = cb.Build()
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "2"),
 					}
@@ -1086,7 +1080,6 @@ var _ = Describe("Fake client", func() {
 				})
 
 				It("Returns deployment that matches both the field and label selectors", func() {
-					cl = cb.Build()
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
 						LabelSelector: labels.SelectorFromSet(dep2.Labels),
@@ -1097,7 +1090,6 @@ var _ = Describe("Fake client", func() {
 				})
 
 				It("Returns no object even if field selector matches because label selector doesn't", func() {
-					cl = cb.Build()
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
 						LabelSelector: labels.Nothing(),
@@ -1108,7 +1100,6 @@ var _ = Describe("Fake client", func() {
 				})
 
 				It("Returns no object even if label selector matches because field selector doesn't", func() {
-					cl = cb.Build()
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "2"),
 						LabelSelector: labels.Everything(),
@@ -1122,11 +1113,7 @@ var _ = Describe("Fake client", func() {
 
 		Context("client has two Indexes", func() {
 			BeforeEach(func() {
-				cb = NewClientBuilder().WithObjects(dep, dep2, cm)
-				depGVR = appsv1.SchemeGroupVersion.WithResource("deployments")
-				cl = cb.WithIndex(depGVR, "spec.replicas", depReplicasIndexer).
-					WithIndex(depGVR, "spec.strategy.type", depStrategyTypeIndexer).
-					Build()
+				cl = cb.WithIndex(depGVR, "spec.strategy.type", depStrategyTypeIndexer).Build()
 			})
 
 			Context("behavior that doesn't require an Index", func() {
