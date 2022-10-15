@@ -1105,7 +1105,16 @@ var _ = Describe("Fake client", func() {
 				Expect(list.Items).To(BeEmpty())
 			})
 
-			// both index and label selector in list options, there are no matches because index doesn't match
+			It("Returns no object even if label selector matches because field selector doesn't", func() {
+				cl = cb.Build()
+				listOpts := &client.ListOptions{
+					FieldSelector: fields.OneTermEqualSelector("spec.replicas", "2"),
+					LabelSelector: labels.Everything(),
+				}
+				list := &appsv1.DeploymentList{}
+				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
+				Expect(list.Items).To(BeEmpty())
+			})
 
 			// TODO: Move all the tests with multiple Indexes to a dedicated context.
 			It("Ignores the registered index that's not part of the field selector when there are matches", func() {
