@@ -1026,139 +1026,153 @@ var _ = Describe("Fake client", func() {
 			cb     *ClientBuilder
 		)
 
-		Context("Behavior that doesn't require an Index", func() {
+		Context("client has just one Index", func() {
+			Context("behavior that doesn't require an Index", func() {
+				BeforeEach(func() {
+					cb = NewClientBuilder().WithObjects(dep, dep2, cm)
+					depGVR = appsv1.SchemeGroupVersion.WithResource("deployments")
+					cl = cb.WithIndex(depGVR, "spec.replicas", depReplicasIndexer).Build()
+				})
+				AssertClientBehavior()
+			})
+
+			Context("filtered List", func() {
+				BeforeEach(func() {
+					cb = NewClientBuilder().
+						WithObjects(dep, dep2, cm).
+						WithIndex(depGVR, "spec.replicas", depReplicasIndexer)
+					depGVR = appsv1.SchemeGroupVersion.WithResource("deployments")
+				})
+
+				It("Panics when there's no Index for the GroupVersionResource", func() {
+					cl = cb.Build()
+					listOpts := &client.ListOptions{
+						FieldSelector: fields.Everything(),
+					}
+					Expect(func() {
+						cl.List(context.Background(), &corev1.ConfigMapList{}, listOpts)
+					}).To(Panic())
+				})
+
+				It("Returns the empty list when no index with the field selector key is registered", func() {
+					// TODO: make this test more precise in asserting the desired behavior.
+					cl = cb.Build()
+					listOpts := &client.ListOptions{
+						FieldSelector: fields.OneTermEqualSelector("spec.paused", "false"),
+					}
+					list := &appsv1.DeploymentList{}
+					Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
+					Expect(list.Items).To(BeEmpty())
+				})
+
+				It("Returns two deployments that match the only field selector requirement", func() {
+					cl = cb.Build()
+					listOpts := &client.ListOptions{
+						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
+					}
+					list := &appsv1.DeploymentList{}
+					Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
+					Expect(list.Items).To(ConsistOf(*dep, *dep2))
+				})
+
+				It("Returns no object because no object matches the only field selector requirement", func() {
+					cl = cb.Build()
+					listOpts := &client.ListOptions{
+						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "2"),
+					}
+					list := &appsv1.DeploymentList{}
+					Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
+					Expect(list.Items).To(BeEmpty())
+				})
+
+				It("Returns deployment that matches both the field and label selectors", func() {
+					cl = cb.Build()
+					listOpts := &client.ListOptions{
+						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
+						LabelSelector: labels.SelectorFromSet(dep2.Labels),
+					}
+					list := &appsv1.DeploymentList{}
+					Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
+					Expect(list.Items).To(ConsistOf(*dep2))
+				})
+
+				It("Returns no object even if field selector matches because label selector doesn't", func() {
+					cl = cb.Build()
+					listOpts := &client.ListOptions{
+						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
+						LabelSelector: labels.Nothing(),
+					}
+					list := &appsv1.DeploymentList{}
+					Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
+					Expect(list.Items).To(BeEmpty())
+				})
+
+				It("Returns no object even if label selector matches because field selector doesn't", func() {
+					cl = cb.Build()
+					listOpts := &client.ListOptions{
+						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "2"),
+						LabelSelector: labels.Everything(),
+					}
+					list := &appsv1.DeploymentList{}
+					Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
+					Expect(list.Items).To(BeEmpty())
+				})
+			})
+		})
+
+		Context("client has two Indexes", func() {
 			BeforeEach(func() {
 				cb = NewClientBuilder().WithObjects(dep, dep2, cm)
 				depGVR = appsv1.SchemeGroupVersion.WithResource("deployments")
-				cl = cb.WithIndex(depGVR, "spec.replicas", depReplicasIndexer).Build()
-			})
-			AssertClientBehavior()
-		})
-
-		Context("Filtered List", func() {
-			BeforeEach(func() {
-				cb = NewClientBuilder().
-					WithObjects(dep, dep2, cm).
-					WithIndex(depGVR, "spec.replicas", depReplicasIndexer)
-				depGVR = appsv1.SchemeGroupVersion.WithResource("deployments")
-			})
-			It("Panics when there's no Index for the GroupVersionResource", func() {
-				cl = cb.Build()
-				listOpts := &client.ListOptions{
-					FieldSelector: fields.Everything(),
-				}
-				Expect(func() {
-					cl.List(context.Background(), &corev1.ConfigMapList{}, listOpts)
-				}).To(Panic())
+				cl = cb.WithIndex(depGVR, "spec.replicas", depReplicasIndexer).
+					WithIndex(depGVR, "spec.strategy.type", depStrategyTypeIndexer).
+					Build()
 			})
 
-			It("Returns the empty list when no index with the field selector key is registered", func() {
-				// TODO: make this test more precise in asserting the desired behavior.
-				cl = cb.Build()
-				listOpts := &client.ListOptions{
-					FieldSelector: fields.OneTermEqualSelector("spec.paused", "false"),
-				}
-				list := &appsv1.DeploymentList{}
-				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
-				Expect(list.Items).To(BeEmpty())
+			Context("behavior that doesn't require an Index", func() {
+				AssertClientBehavior()
 			})
 
-			It("Returns two deployments that match the only field selector requirement", func() {
-				cl = cb.Build()
-				listOpts := &client.ListOptions{
-					FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
-				}
-				list := &appsv1.DeploymentList{}
-				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
-				Expect(list.Items).To(ConsistOf(*dep, *dep2))
-			})
+			Context("filtered List", func() {
+				It("Ignores the registered index that's not part of the field selector when there are matches", func() {
+					listOpts := &client.ListOptions{
+						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
+					}
+					list := &appsv1.DeploymentList{}
+					Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
+					Expect(list.Items).To(ConsistOf(*dep, *dep2))
+				})
 
-			It("Returns no object because no object matches the only field selector requirement", func() {
-				cl = cb.Build()
-				listOpts := &client.ListOptions{
-					FieldSelector: fields.OneTermEqualSelector("spec.replicas", "2"),
-				}
-				list := &appsv1.DeploymentList{}
-				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
-				Expect(list.Items).To(BeEmpty())
-			})
+				It("Ignores the registered index that's not part of the field selector when there are no matches", func() {
+					listOpts := &client.ListOptions{
+						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "2"),
+					}
+					list := &appsv1.DeploymentList{}
+					Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
+					Expect(list.Items).To(BeEmpty())
+				})
 
-			It("Returns deployment that matches both the field and label selectors", func() {
-				cl = cb.Build()
-				listOpts := &client.ListOptions{
-					FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
-					LabelSelector: labels.SelectorFromSet(dep2.Labels),
-				}
-				list := &appsv1.DeploymentList{}
-				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
-				Expect(list.Items).To(ConsistOf(*dep2))
-			})
+				It("Returns the only deployment that matches two field selector requirements", func() {
+					listOpts := &client.ListOptions{
+						FieldSelector: fields.AndSelectors(
+							fields.OneTermEqualSelector("spec.replicas", "1"),
+							fields.OneTermEqualSelector("spec.strategy.type", string(appsv1.RecreateDeploymentStrategyType)),
+						)}
+					list := &appsv1.DeploymentList{}
+					Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
+					Expect(list.Items).To(ConsistOf(*dep))
+				})
 
-			It("Returns no object even if field selector matches because label selector doesn't", func() {
-				cl = cb.Build()
-				listOpts := &client.ListOptions{
-					FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
-					LabelSelector: labels.Nothing(),
-				}
-				list := &appsv1.DeploymentList{}
-				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
-				Expect(list.Items).To(BeEmpty())
-			})
-
-			It("Returns no object even if label selector matches because field selector doesn't", func() {
-				cl = cb.Build()
-				listOpts := &client.ListOptions{
-					FieldSelector: fields.OneTermEqualSelector("spec.replicas", "2"),
-					LabelSelector: labels.Everything(),
-				}
-				list := &appsv1.DeploymentList{}
-				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
-				Expect(list.Items).To(BeEmpty())
-			})
-
-			// TODO: Move all the tests with multiple Indexes to a dedicated context.
-			It("Ignores the registered index that's not part of the field selector when there are matches", func() {
-				cl = cb.WithIndex(depGVR, "spec.strategy.type", depStrategyTypeIndexer).Build()
-				listOpts := &client.ListOptions{
-					FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
-				}
-				list := &appsv1.DeploymentList{}
-				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
-				Expect(list.Items).To(ConsistOf(*dep, *dep2))
-			})
-
-			It("Ignores the registered index that's not part of the field selector when there are no matches", func() {
-				cl = cb.WithIndex(depGVR, "spec.strategy.type", depStrategyTypeIndexer).Build()
-				listOpts := &client.ListOptions{
-					FieldSelector: fields.OneTermEqualSelector("spec.replicas", "2"),
-				}
-				list := &appsv1.DeploymentList{}
-				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
-				Expect(list.Items).To(BeEmpty())
-			})
-
-			It("Returns the only deployment that matches two field selector requirements", func() {
-				cl = cb.WithIndex(depGVR, "spec.strategy.type", depStrategyTypeIndexer).Build()
-				listOpts := &client.ListOptions{
-					FieldSelector: fields.AndSelectors(
-						fields.OneTermEqualSelector("spec.replicas", "1"),
-						fields.OneTermEqualSelector("spec.strategy.type", string(appsv1.RecreateDeploymentStrategyType)),
-					)}
-				list := &appsv1.DeploymentList{}
-				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
-				Expect(list.Items).To(ConsistOf(*dep))
-			})
-
-			It("Returns no object because no object matches both field selector requirements", func() {
-				cl = cb.WithIndex(depGVR, "spec.strategy.type", depStrategyTypeIndexer).Build()
-				listOpts := &client.ListOptions{
-					FieldSelector: fields.AndSelectors(
-						fields.OneTermEqualSelector("spec.replicas", "2"),
-						fields.OneTermEqualSelector("spec.strategy.type", string(appsv1.RecreateDeploymentStrategyType)),
-					)}
-				list := &appsv1.DeploymentList{}
-				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
-				Expect(list.Items).To(BeEmpty())
+				It("Returns no object because no object matches both field selector requirements", func() {
+					listOpts := &client.ListOptions{
+						FieldSelector: fields.AndSelectors(
+							fields.OneTermEqualSelector("spec.replicas", "2"),
+							fields.OneTermEqualSelector("spec.strategy.type", string(appsv1.RecreateDeploymentStrategyType)),
+						)}
+					list := &appsv1.DeploymentList{}
+					Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
+					Expect(list.Items).To(BeEmpty())
+				})
 			})
 		})
 	})
