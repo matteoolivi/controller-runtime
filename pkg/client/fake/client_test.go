@@ -1102,9 +1102,20 @@ var _ = Describe("Fake client", func() {
 				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
 				Expect(list.Items).To(BeEmpty())
 			})
+
+			It("Returns the only deployment that matches two field selector requirements", func() {
+				cl = cb.WithIndex(depGVR, "spec.strategy.type", depStrategyTypeIndexer).Build()
+				listOpts := &client.ListOptions{
+					FieldSelector: fields.AndSelectors(
+						fields.OneTermEqualSelector("spec.replicas", "1"),
+						fields.OneTermEqualSelector("spec.strategy.type", string(appsv1.RecreateDeploymentStrategyType)),
+					)}
+				list := &appsv1.DeploymentList{}
+				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
+				Expect(list.Items).To(ConsistOf(*dep))
+			})
 		})
 
-		// multiple indexes and all are in the list options, matches are returned
 		// multiple indexes and all are in the list options, there are no matches
 		// both index and label selector in list options, matches are returned
 		// both index and label selector in list options, there are no matches because label selector doesn't match
