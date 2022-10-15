@@ -472,6 +472,9 @@ func (c *fakeClient) List(ctx context.Context, obj client.ObjectList, opts ...cl
 		if err != nil {
 			return err
 		}
+
+		// Field selection is mimicked via indices, so there's no sane answer this function can give
+		// if there are no indexes registered for the GroupVersionResource of the objects in the list.
 		if _, hasIndexes := c.indexes[gvr]; !hasIndexes {
 			panic(fmt.Errorf("List on GroupVersionResource %v specifies field selector, but no "+
 				"indexes for that GroupResourceVersion are defined", gvr))
