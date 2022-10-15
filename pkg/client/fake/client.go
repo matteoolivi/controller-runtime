@@ -479,21 +479,8 @@ func (c *fakeClient) List(ctx context.Context, obj client.ObjectList, opts ...cl
 
 		filteredObjs := make([]runtime.Object, 0, len(objs))
 		for _, o := range objs {
-			// convert o from runtime.Object to client.Object because that's what index functions
-			// accept.
-			co, ok := o.(client.Object)
-			if !ok {
-				panic(fmt.Errorf("obj %v in list doesn't implement client.Object interface", o))
-			}
-			oFields := make(map[string]string)
-			for indexName, indexFunc := range c.indexes[gvr] {
-				indexVals := indexFunc(co)
-				if len(indexVals) == 1 {
-					oFields[indexName] = indexVals[0]
-				}
-			}
 			// TODO: think more and maybe fix case where there's no index matchin the keys in the field selector.
-			if listOpts.FieldSelector.Matches(fields.Set(oFields)) {
+			if c.objMatchesFieldSelector(o, gvr, listOpts.FieldSelector) {
 				filteredObjs = append(filteredObjs, o)
 			}
 		}
@@ -503,6 +490,23 @@ func (c *fakeClient) List(ctx context.Context, obj client.ObjectList, opts ...cl
 	}
 
 	return nil
+}
+
+func (c *fakeClient) objMatchesFieldSelector(obj runtime.Object, gvr schema.GroupVersionResource, fs fields.Selector) bool {
+	// convert obj from runtime.Object to client.Object because that's what index functions
+	// accept.
+	cObj, ok := obj.(client.Object)
+	if !ok {
+		panic(fmt.Errorf("obj %v in list doesn't implement client.Object interface", obj))
+	}
+	objFields := make(map[string]string)
+	for indexName, indexFunc := range c.indexes[gvr] {
+		indexVals := indexFunc(cObj)
+		if len(indexVals) == 1 {
+			objFields[indexName] = indexVals[0]
+		}
+	}
+	return fs.Matches(fields.Set(objFields))
 }
 
 func (c *fakeClient) Scheme() *runtime.Scheme {
