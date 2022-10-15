@@ -484,6 +484,7 @@ func (c *fakeClient) List(ctx context.Context, obj client.ObjectList, opts ...cl
 				filteredObjs = append(filteredObjs, o)
 			}
 		}
+
 		if err := meta.SetList(obj, filteredObjs); err != nil {
 			return err
 		}
@@ -493,12 +494,18 @@ func (c *fakeClient) List(ctx context.Context, obj client.ObjectList, opts ...cl
 }
 
 func (c *fakeClient) objMatchesFieldSelector(obj runtime.Object, gvr schema.GroupVersionResource, fs fields.Selector) bool {
+	objFields := c.objFields(obj, gvr)
+	return fs.Matches(objFields)
+}
+
+func (c *fakeClient) objFields(obj runtime.Object, gvr schema.GroupVersionResource) fields.Set {
 	// convert obj from runtime.Object to client.Object because that's what index functions
 	// accept.
 	cObj, ok := obj.(client.Object)
 	if !ok {
 		panic(fmt.Errorf("obj %v in list doesn't implement client.Object interface", obj))
 	}
+
 	objFields := make(map[string]string)
 	for indexName, indexFunc := range c.indexes[gvr] {
 		indexVals := indexFunc(cObj)
@@ -506,7 +513,8 @@ func (c *fakeClient) objMatchesFieldSelector(obj runtime.Object, gvr schema.Grou
 			objFields[indexName] = indexVals[0]
 		}
 	}
-	return fs.Matches(fields.Set(objFields))
+
+	return fields.Set(objFields)
 }
 
 func (c *fakeClient) Scheme() *runtime.Scheme {
