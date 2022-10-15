@@ -1041,8 +1041,18 @@ var _ = Describe("Fake client", func() {
 					cl.List(context.Background(), &corev1.ConfigMapList{}, listOpts)
 				}).To(Panic())
 			})
+
+			It("Returns the empty list when no index with the field selector key is registered", func() {
+				// TODO: make this test more precise in asserting the desired behavior.
+				cl = cb.Build()
+				listOpts := &client.ListOptions{
+					FieldSelector: fields.OneTermEqualSelector("spec.paused", "false"),
+				}
+				list := &appsv1.DeploymentList{}
+				Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
+				Expect(list.Items).To(BeEmpty())
+			})
 		})
-		// there are indexes in the list request, but not the registered ones, nothing is returned.
 		// just one index, some objects match
 		// just one index, no objects match
 		// multiple indexes but only one is in the list options, matches are returned

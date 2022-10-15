@@ -492,6 +492,7 @@ func (c *fakeClient) List(ctx context.Context, obj client.ObjectList, opts ...cl
 					oFields[indexName] = indexVals[0]
 				}
 			}
+			// TODO: think more and maybe fix case where there's no index matchin the keys in the field selector.
 			if listOpts.FieldSelector.Matches(fields.Set(oFields)) {
 				filteredObjs = append(filteredObjs, o)
 			}
