@@ -1040,8 +1040,8 @@ var _ = Describe("Fake client", func() {
 				AssertClientBehavior()
 			})
 
-			Context("filtered List", func() {
-				It("Panics when there's no Index for the GroupVersionResource", func() {
+			Context("filtered List using field selector", func() {
+				It("panics when there's no Index for the GroupVersionResource", func() {
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.Everything(),
 					}
@@ -1050,7 +1050,7 @@ var _ = Describe("Fake client", func() {
 					}).To(Panic())
 				})
 
-				It("Returns the empty list when no index with the field selector key is registered", func() {
+				It("returns the empty list when no index with the field selector key is registered", func() {
 					// TODO: make this test more precise in asserting the desired behavior.
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.OneTermEqualSelector("spec.paused", "false"),
@@ -1060,7 +1060,7 @@ var _ = Describe("Fake client", func() {
 					Expect(list.Items).To(BeEmpty())
 				})
 
-				It("Returns two deployments that match the only field selector requirement", func() {
+				It("returns two deployments that match the only field selector requirement", func() {
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
 					}
@@ -1069,7 +1069,7 @@ var _ = Describe("Fake client", func() {
 					Expect(list.Items).To(ConsistOf(*dep, *dep2))
 				})
 
-				It("Returns no object because no object matches the only field selector requirement", func() {
+				It("returns no object because no object matches the only field selector requirement", func() {
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "2"),
 					}
@@ -1078,7 +1078,7 @@ var _ = Describe("Fake client", func() {
 					Expect(list.Items).To(BeEmpty())
 				})
 
-				It("Returns deployment that matches both the field and label selectors", func() {
+				It("returns deployment that matches both the field and label selectors", func() {
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
 						LabelSelector: labels.SelectorFromSet(dep2.Labels),
@@ -1088,7 +1088,7 @@ var _ = Describe("Fake client", func() {
 					Expect(list.Items).To(ConsistOf(*dep2))
 				})
 
-				It("Returns no object even if field selector matches because label selector doesn't", func() {
+				It("returns no object even if field selector matches because label selector doesn't", func() {
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
 						LabelSelector: labels.Nothing(),
@@ -1098,7 +1098,7 @@ var _ = Describe("Fake client", func() {
 					Expect(list.Items).To(BeEmpty())
 				})
 
-				It("Returns no object even if label selector matches because field selector doesn't", func() {
+				It("returns no object even if label selector matches because field selector doesn't", func() {
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "2"),
 						LabelSelector: labels.Everything(),
@@ -1119,8 +1119,8 @@ var _ = Describe("Fake client", func() {
 				AssertClientBehavior()
 			})
 
-			Context("filtered List", func() {
-				It("Ignores the registered index that's not part of the field selector when there are matches", func() {
+			Context("filtered List using filed selector", func() {
+				It("ignores the registered index that's not part of the field selector when there are matches", func() {
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
 					}
@@ -1129,7 +1129,7 @@ var _ = Describe("Fake client", func() {
 					Expect(list.Items).To(ConsistOf(*dep, *dep2))
 				})
 
-				It("Ignores the registered index that's not part of the field selector when there are no matches", func() {
+				It("ignores the registered index that's not part of the field selector when there are no matches", func() {
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "2"),
 					}
@@ -1138,7 +1138,7 @@ var _ = Describe("Fake client", func() {
 					Expect(list.Items).To(BeEmpty())
 				})
 
-				It("Returns the only deployment that matches two field selector requirements", func() {
+				It("returns the only deployment that matches two field selector requirements", func() {
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.AndSelectors(
 							fields.OneTermEqualSelector("spec.replicas", "1"),
@@ -1149,7 +1149,7 @@ var _ = Describe("Fake client", func() {
 					Expect(list.Items).To(ConsistOf(*dep))
 				})
 
-				It("Returns no object because no object matches both field selector requirements", func() {
+				It("returns no object because no object matches both field selector requirements", func() {
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.AndSelectors(
 							fields.OneTermEqualSelector("spec.replicas", "2"),
@@ -1233,7 +1233,7 @@ var _ = Describe("Fake client", func() {
 })
 
 var _ = Describe("Fake client builder", func() {
-	It("Panics when an index with the same name and GroupVersionResource is registered twice", func() {
+	It("panics when an index with the same name and GroupVersionResource is registered twice", func() {
 		// We need any realistic GroupVersionResource, the choice of deployments is arbitrary.
 		gvr := appsv1.SchemeGroupVersion.WithResource("deployments")
 
