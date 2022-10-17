@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/testing"
+	selector "sigs.k8s.io/controller-runtime/pkg/internal/selector"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -475,6 +476,13 @@ func (c *fakeClient) List(ctx context.Context, obj client.ObjectList, opts ...cl
 	}
 
 	if listOpts.FieldSelector != nil {
+		_, _, requiresExact := selector.RequiresExactMatch(listOpts.FieldSelector)
+		if !requiresExact {
+			panic(fmt.Errorf("non-exact field matches are not supported by the cache"))
+		}
+
+		//TODO : mirror client behavior --> check if index for field was registered
+
 		objs, err := meta.ExtractList(obj)
 		if err != nil {
 			return err

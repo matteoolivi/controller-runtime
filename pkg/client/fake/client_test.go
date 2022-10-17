@@ -1041,6 +1041,8 @@ var _ = Describe("Fake client", func() {
 			})
 
 			Context("filtered List using field selector", func() {
+				//TODO : test that panics if selector is no exact match
+
 				It("panics when there's no Index for the GroupVersionResource", func() {
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.Everything(),
@@ -1119,7 +1121,7 @@ var _ = Describe("Fake client", func() {
 				AssertClientWOIndexBehavior()
 			})
 
-			Context("filtered List using filed selector", func() {
+			Context("filtered List using field selector", func() {
 				It("ignores the registered index that's not part of the field selector when there are matches", func() {
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.OneTermEqualSelector("spec.replicas", "1"),
@@ -1138,26 +1140,16 @@ var _ = Describe("Fake client", func() {
 					Expect(list.Items).To(BeEmpty())
 				})
 
-				It("returns the only deployment that matches two field selector requirements", func() {
+				It("panics because of field selector using two requirements", func() {
 					listOpts := &client.ListOptions{
 						FieldSelector: fields.AndSelectors(
 							fields.OneTermEqualSelector("spec.replicas", "1"),
 							fields.OneTermEqualSelector("spec.strategy.type", string(appsv1.RecreateDeploymentStrategyType)),
 						)}
 					list := &appsv1.DeploymentList{}
-					Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
-					Expect(list.Items).To(ConsistOf(*dep))
-				})
-
-				It("returns no object because no object matches both field selector requirements", func() {
-					listOpts := &client.ListOptions{
-						FieldSelector: fields.AndSelectors(
-							fields.OneTermEqualSelector("spec.replicas", "2"),
-							fields.OneTermEqualSelector("spec.strategy.type", string(appsv1.RecreateDeploymentStrategyType)),
-						)}
-					list := &appsv1.DeploymentList{}
-					Expect(cl.List(context.Background(), list, listOpts)).To(Succeed())
-					Expect(list.Items).To(BeEmpty())
+					Expect(func() {
+						cl.List(context.Background(), list, listOpts)
+					}).To(Panic())
 				})
 			})
 		})
