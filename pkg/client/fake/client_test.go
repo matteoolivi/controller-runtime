@@ -103,7 +103,7 @@ var _ = Describe("Fake client", func() {
 		}
 	})
 
-	AssertClientBehavior := func() {
+	AssertClientWOIndexBehavior := func() {
 		It("should be able to Get", func() {
 			By("Getting a deployment")
 			namespacedName := types.NamespacedName{
@@ -984,7 +984,7 @@ var _ = Describe("Fake client", func() {
 				WithObjects(dep, dep2, cm).
 				Build()
 		})
-		AssertClientBehavior()
+		AssertClientWOIndexBehavior()
 	})
 
 	Context("with given scheme", func() {
@@ -999,7 +999,7 @@ var _ = Describe("Fake client", func() {
 				WithLists(&appsv1.DeploymentList{Items: []appsv1.Deployment{*dep, *dep2}}).
 				Build()
 		})
-		AssertClientBehavior()
+		AssertClientWOIndexBehavior()
 	})
 
 	Context("with Indexes", func() {
@@ -1036,8 +1036,8 @@ var _ = Describe("Fake client", func() {
 		Context("client has just one Index", func() {
 			BeforeEach(func() { cl = cb.Build() })
 
-			Context("behavior that doesn't require an Index", func() {
-				AssertClientBehavior()
+			Context("behavior that doesn't use an Index", func() {
+				AssertClientWOIndexBehavior()
 			})
 
 			Context("filtered List using field selector", func() {
@@ -1115,8 +1115,8 @@ var _ = Describe("Fake client", func() {
 				cl = cb.WithIndex(depGVR, "spec.strategy.type", depStrategyTypeIndexer).Build()
 			})
 
-			Context("behavior that doesn't require an Index", func() {
-				AssertClientBehavior()
+			Context("behavior that doesn't use an Index", func() {
+				AssertClientWOIndexBehavior()
 			})
 
 			Context("filtered List using filed selector", func() {
