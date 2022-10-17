@@ -40,8 +40,33 @@ var _ = Describe("RequiresExactMatch function", func() {
 		Expect(requiresExactMatch).To(BeTrue())
 	})
 
-	It("Returns true when the selector has the form key1==val1", func() {
+	It("Returns empty key and value when the selector matches everything", func() {
+		key, val, _ := RequiresExactMatch(fields.Everything())
+		Expect(key).To(Equal(""))
+		Expect(val).To(Equal(""))
+	})
+
+	It("Returns empty key and value when the selector matches nothing", func() {
+		key, val, _ := RequiresExactMatch(fields.Nothing())
+		Expect(key).To(Equal(""))
+		Expect(val).To(Equal(""))
+	})
+
+	It("Returns empty key and value when selector has the form key1!=val1", func() {
+		key, val, _ := RequiresExactMatch(fields.ParseSelectorOrDie("key1!=val1"))
+		Expect(key).To(Equal(""))
+		Expect(val).To(Equal(""))
+	})
+
+	It("Returned key and value match selector constraint when selector has the form key1==val1", func() {
 		key, val, _ := RequiresExactMatch(fields.ParseSelectorOrDie("key1==val1"))
-		Expect(requiresExactMatch).To(BeTrue())
+		Expect(key).To(Equal("key1"))
+		Expect(val).To(Equal("val1"))
+	})
+
+	It("Returned key and value match selector constraint when selector has the form key1=val1", func() {
+		key, val, _ := RequiresExactMatch(fields.ParseSelectorOrDie("key1=val1"))
+		Expect(key).To(Equal("key1"))
+		Expect(val).To(Equal("val1"))
 	})
 })
